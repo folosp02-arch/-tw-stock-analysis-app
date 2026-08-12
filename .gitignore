@@ -1,0 +1,14 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# 環境變數/金鑰（雖然目前是用系統環境變數設定，沒有寫進檔案，但保險起見還是排除）
+.env
+*.key
+
+# 編輯器/系統雜項
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
