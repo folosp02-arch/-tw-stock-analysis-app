@@ -33,6 +33,10 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; tw-stock-dashboard/0.1)"}
 def _get(url: str, params: Optional[dict] = None, timeout: int = 10):
     resp = requests.get(url, params=params, headers=HEADERS, timeout=timeout)
     resp.raise_for_status()
+    # 明確指定UTF-8解碼：不同作業系統環境（本機Windows vs Render的Linux）
+    # 對回應編碼的自動猜測結果可能不一致，導致中文欄位（例如指數名稱、股票名稱）亂碼，
+    # 數字欄位不受影響。TWSE的回應本身就是UTF-8，直接指定最保險。
+    resp.encoding = "utf-8"
     return resp.json()
 
 
@@ -317,6 +321,8 @@ def build_market_overview() -> dict:
 # ---------------------------------------------------------------------------
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+import os
 
 import stock_screener  # 需與 market_data.py 放在同一個資料夾
 import ai_insight as ai_insight_module  # 同上，需放在同一個資料夾
@@ -328,6 +334,19 @@ app.add_middleware(
     allow_origins=["*"],  # 開發階段先開放，正式上線請改成前端實際網域
     allow_methods=["GET"],
 )
+
+# 這個路由原本是給「區網內用手機連PC」的方案用的（把前端跟API掛在同一個伺服器）。
+# 現在改用 GitHub Pages 放前端、Render 純粹當API，所以這裡不是必要路徑了，
+# 但保留一個安全版本：本機還是可以用，雲端環境（檔案不存在）就回傳提示訊息，
+# 不要讓整個服務因為單一路由的檔案讀取錯誤而500當機。
+_FRONTEND_HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tw-stock-dashboard-prototype.html")
+
+
+@app.get("/")
+def serve_frontend():
+    if os.path.exists(_FRONTEND_HTML_PATH):
+        return FileResponse(_FRONTEND_HTML_PATH)
+    return {"message": "台股盤勢 API 運作中。前端頁面請至 GitHub Pages 開啟，或參考 /docs 查看可用端點。"}
 
 
 @app.get("/api/market-overview")

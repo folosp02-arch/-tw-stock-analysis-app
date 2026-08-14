@@ -62,6 +62,7 @@ def _finmind_get(dataset: str, stock_id: str, start_date: str, end_date: Optiona
         headers["Authorization"] = f"Bearer {FINMIND_TOKEN}"
     resp = requests.get(FINMIND_BASE, params=params, headers=headers, timeout=15)
     resp.raise_for_status()
+    resp.encoding = "utf-8"  # 避免不同作業系統環境猜測編碼不一致導致中文欄位亂碼
     payload = resp.json()
     if payload.get("status") != 200 and "data" not in payload:
         raise ValueError(f"FinMind回應異常（{dataset} / {stock_id}）: {payload.get('msg')}")
