@@ -349,6 +349,12 @@ def serve_frontend():
     return {"message": "台股盤勢 API 運作中。前端頁面請至 GitHub Pages 開啟，或參考 /docs 查看可用端點。"}
 
 
+@app.get("/api/health")
+def health():
+    """給UptimeRobot之類的服務定時ping用，不做任何資料抓取，純粹確認伺服器還活著。"""
+    return {"status": "ok", "time": datetime.now().isoformat()}
+
+
 @app.get("/api/market-overview")
 def market_overview():
     return build_market_overview()
