@@ -23,6 +23,7 @@ from datetime import datetime
 from typing import Optional
 
 import requests
+import pandas as pd
 
 TWSE_BASE = "https://openapi.twse.com.tw/v1"
 FINMIND_BASE = "https://api.finmindtrade.com/api/v4/data"
@@ -398,6 +399,47 @@ def stock_picks():
     cache["data"] = picks
     cache["fetched_at"] = now
     return {"updated_at": now.isoformat(), "picks": picks, "cached": False}
+
+
+# 個股詳情：依股票代號分開快取，30分鐘內重複點同一檔不用重打FinMind
+_stock_detail_cache = {}
+_STOCK_DETAIL_TTL_SECONDS = 30 * 60
+
+
+@app.get("/api/stock-detail")
+def stock_detail(stock_id: str):
+    now = datetime.now()
+    cache = _stock_detail_cache.setdefault(stock_id, {"data": None, "fetched_at": None})
+    if cache["data"] is not None and (now - cache["fetched_at"]).total_seconds() < _STOCK_DETAIL_TTL_SECONDS:
+        result = dict(cache["data"])
+        result["cached"] = True
+        return result
+
+    try:
+        df = stock_screener.compute_indicators(stock_screener.fetch_price_history(stock_id, lookback_days=150))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"抓取 {stock_id} 歷史資料失敗：{e}")
+
+    # 只取最近90筆，避免資料量太大；轉成前端好用的格式，NaN（前面均線還沒算出來的部分）轉成null
+    recent = df.tail(90)
+    series = []
+    for _, row in recent.iterrows():
+        series.append({
+            "date": str(row["date"]),
+            "close": round(float(row["close"]), 2),
+            "ma5": round(float(row["ma5"]), 2) if pd.notna(row["ma5"]) else None,
+            "ma20": round(float(row["ma20"]), 2) if pd.notna(row["ma20"]) else None,
+            "ma60": round(float(row["ma60"]), 2) if pd.notna(row["ma60"]) else None,
+            "k": round(float(row["k"]), 1) if pd.notna(row["k"]) else None,
+            "d": round(float(row["d"]), 1) if pd.notna(row["d"]) else None,
+        })
+
+    result = {"stock_id": stock_id, "series": series}
+    cache["data"] = result
+    cache["fetched_at"] = now
+    result = dict(result)
+    result["cached"] = False
+    return result
 
 
 # AI視角快取；用字典依 engine（rules/llm）分開存，llm模式會產生API費用所以更需要快取。
