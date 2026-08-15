@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台股盤勢儀表板 · 原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink: #0d1117;
+    --panel: #12171f;
+    --panel-2: #161d27;
+    --line: #232b36;
+    --text: #e7ebf1;
+    --text-dim: #8b96a5;
+    --text-faint: #566172;
+    --up: #ff5c5c;       /* 台股慣例：紅漲 */
+    --up-bg: rgba(255,92,92,0.10);
+    --down: #35c47a;     /* 台股慣例：綠跌 */
+    --down-bg: rgba(53,196,122,0.10);
+    --amber: #e8b04b;    /* AI 洞察專用強調色 */
+    --amber-bg: rgba(232,176,75,0.08);
+    --amber-line: rgba(232,176,75,0.35);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background: var(--ink);
+    color: var(--text);
+    font-family: 'Noto Sans TC', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  .mono{ font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+
+  /* ---- Ticker (signature element) ---- */
+  .ticker-wrap{
+    background: #080a0e;
+    border-bottom: 1px solid var(--line);
+    overflow: hidden;
+    white-space: nowrap;
+    padding: 9px 0;
+  }
+  .ticker{
+    display: inline-block;
+    animation: scroll-left 32s linear infinite;
+  }
+  .ticker span.item{
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-right: 36px;
+    font-size: 12.5px;
+  }
+  .ticker .name{ color: var(--text-dim); }
+  .ticker .val{ font-weight: 600; }
+  .ticker .up{ color: var(--up); }
+  .ticker .down{ color: var(--down); }
+  @keyframes scroll-left{
+    0%{ transform: translateX(0); }
+    100%{ transform: translateX(-50%); }
+  }
+
+  .wrap{ max-width: 1080px; margin: 0 auto; padding: 28px 20px 64px; }
+
+  header.top{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom: 22px; flex-wrap: wrap; gap: 10px;
+  }
+  .brand{ display:flex; align-items:baseline; gap:10px; }
+  .brand .dot{
+    width:7px; height:7px; border-radius:50%; background: var(--down);
+    display:inline-block; box-shadow: 0 0 0 3px var(--down-bg);
+    animation: pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  .brand h1{ font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
+  .brand .status{ font-size: 12px; color: var(--text-dim); }
+  .date{ font-size: 12px; color: var(--text-faint); }
+  .mock-badge{
+    font-size: 10.5px; color: var(--amber); border: 1px solid var(--amber-line);
+    background: var(--amber-bg); padding: 2px 8px; border-radius: 20px; letter-spacing: 0.03em;
+  }
+
+  /* ---- Hero index ---- */
+  .hero{
+    background: linear-gradient(160deg, var(--panel), var(--panel-2));
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 26px 28px;
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 24px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 720px){ .hero{ grid-template-columns: 1fr; } }
+  .hero-label{ font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+  .hero-num{ font-size: 46px; font-weight: 700; line-height:1; display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;}
+  .hero-chg{ font-size: 18px; font-weight: 600; padding-bottom: 5px; }
+  .hero-sub{ margin-top: 12px; display:flex; gap: 22px; font-size: 12.5px; color: var(--text-dim); }
+  .hero-sub b{ color: var(--text); font-weight: 600; }
+
+  .adv-decline{ display:flex; flex-direction:column; justify-content:center; gap:10px; }
+  .ad-row{ display:flex; align-items:center; gap:10px; font-size:12.5px; }
+  .ad-label{ width:56px; color: var(--text-dim); }
+  .ad-bar{ flex:1; height:8px; border-radius:5px; background:#1c232d; overflow:hidden; display:flex; }
+  .ad-fill-up{ background: var(--up); height:100%; }
+  .ad-fill-down{ background: var(--down); height:100%; }
+  .ad-count{ width:44px; text-align:right; }
+
+  /* ---- Institutional row ---- */
+  .inst{
+    display:grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 28px;
+  }
+  @media (max-width: 620px){ .inst{ grid-template-columns: 1fr; } }
+  .inst .card{
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .inst .card .k{ font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+  .inst .card .v{ font-size: 21px; font-weight: 700; }
+
+  /* ---- Section heading ---- */
+  .sec-head{ display:flex; align-items:baseline; justify-content:space-between; margin: 34px 0 14px; }
+  .sec-head h2{ font-size: 15px; font-weight: 700; }
+  .sec-head .note{ font-size: 11.5px; color: var(--text-faint); }
+
+  /* ---- Candidate stock cards ---- */
+  .picks{ display:grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 720px){ .picks{ grid-template-columns: 1fr; } }
+  .pick{
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px;
+    position: relative;
+  }
+  .pick-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 12px; }
+  .pick-name{ font-size: 15px; font-weight: 700; }
+  .pick-code{ font-size: 11.5px; color: var(--text-faint); margin-top:2px;}
+  .pick-price{ text-align:right; }
+  .pick-price .p{ font-size: 17px; font-weight: 700; }
+  .pick-price .c{ font-size: 11.5px; font-weight: 600; }
+  .tag{
+    display:inline-block; font-size: 10.5px; padding: 3px 8px; border-radius: 6px;
+    border: 1px solid var(--line); color: var(--text-dim); margin-right:6px; margin-bottom:10px;
+  }
+  .tag.hot{ color: var(--up); border-color: rgba(255,92,92,0.35); background: var(--up-bg); }
+  .range-row{ display:flex; justify-content:space-between; font-size: 12px; margin-top: 12px; padding-top:12px; border-top: 1px dashed var(--line); }
+  .range-row .k{ color: var(--text-dim); }
+  .range-row .v{ font-weight: 600; }
+  .range-row .stop{ color: var(--down); }
+
+  /* ---- AI insight ---- */
+  .ai-box{
+    background: var(--amber-bg); border: 1px solid var(--amber-line); border-radius: 14px;
+    padding: 22px 24px; margin-top: 30px;
+  }
+  .ai-head{ display:flex; align-items:center; gap:8px; margin-bottom: 12px; }
+  .ai-head .badge{
+    font-size: 10.5px; font-weight: 700; color: #0d1117; background: var(--amber);
+    padding: 3px 9px; border-radius: 20px; letter-spacing: 0.03em;
+  }
+  .ai-head h2{ font-size: 14.5px; font-weight: 700; color: var(--amber); }
+  .ai-box p{ font-size: 13.5px; line-height: 1.9; color: #d9cdb0; margin-bottom: 10px; }
+  .ai-box p:last-of-type{ margin-bottom: 0; }
+  .ai-box .risk{ color: var(--up); font-weight: 600; }
+
+  footer{ margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 11px; color: var(--text-faint); line-height:1.8; }
+
+  /* ---- Backtest section ---- */
+  .bt-box{
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 22px 24px; margin-top: 30px;
+  }
+  .bt-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom: 14px; flex-wrap:wrap; gap:10px; }
+  .bt-head h2{ font-size: 14.5px; font-weight: 700; }
+  .bt-btn{
+    background: var(--amber); color: #0d1117; border: none; border-radius: 8px;
+    padding: 7px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+    font-family: 'Noto Sans TC', sans-serif;
+  }
+  .bt-btn:hover{ opacity: 0.88; }
+  .bt-btn:disabled{ opacity: 0.5; cursor: not-allowed; }
+  .bt-table{ width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 10px; }
+  .bt-table th, .bt-table td{ text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  .bt-table th:first-child, .bt-table td:first-child{ text-align: left; }
+  .bt-table th{ color: var(--text-dim); font-weight: 500; }
+  .bt-note{ font-size: 11.5px; color: var(--text-faint); margin-top: 12px; line-height: 1.7; }
+
+  /* ---- TAIEX history chart ---- */
+  .chart-box{
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 22px 24px; margin-top: 16px;
+  }
+  .chart-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom: 14px; }
+  .chart-head h2{ font-size: 14.5px; font-weight: 700; }
+  .chart-head .range{ font-size: 11.5px; color: var(--text-faint); }
+  .chart-svg-wrap{ width:100%; overflow-x:auto; }
+  .chart-tooltip-row{ display:flex; justify-content:space-between; font-size: 11px; color: var(--text-faint); margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<div class="ticker-wrap">
+  <div class="ticker" id="ticker"></div>
+</div>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>台股盤勢儀表板</h1>
+      <span class="status">已收盤</span>
+      <span class="mock-badge" id="data-badge">連線中…</span>
+    </div>
+    <div class="date mono" id="date-label">2026/08/08 (五)</div>
+  </header>
+
+  <section class="hero">
+    <div>
+      <div class="hero-label">加權指數 TAIEX</div>
+      <div class="hero-num mono">
+        <span id="taiex-close">—</span>
+        <span class="hero-chg" id="taiex-change">—</span>
+      </div>
+      <div class="hero-sub">
+        <div>成交值 <b class="mono" id="turnover">—</b></div>
+        <div style="color:var(--text-faint)">法人/漲跌家數為當日盤後統計</div>
+      </div>
+    </div>
+    <div class="adv-decline">
+      <div class="ad-row">
+        <div class="ad-label">漲跌家數</div>
+        <div class="ad-bar" id="ad-bar"><div class="ad-fill-up" id="ad-fill-up" style="width:50%"></div><div class="ad-fill-down" id="ad-fill-down" style="width:50%"></div></div>
+      </div>
+      <div style="display:flex; gap:16px; font-size:12px; padding-left:66px;">
+        <span class="up mono" id="ad-up">▲ —</span>
+        <span class="down mono" id="ad-down">▼ —</span>
+        <span class="text-dim mono" id="ad-flat" style="color:var(--text-faint)">平 —</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="inst">
+    <div class="card">
+      <div class="k">外資買賣超</div>
+      <div class="v mono" id="inst-foreign">—</div>
+    </div>
+    <div class="card">
+      <div class="k">投信買賣超</div>
+      <div class="v mono" id="inst-trust">—</div>
+    </div>
+    <div class="card">
+      <div class="k">自營商買賣超</div>
+      <div class="v mono" id="inst-dealer">—</div>
+    </div>
+  </section>
+
+  <div class="chart-box">
+    <div class="chart-head">
+      <h2>加權指數走勢（近3個月）</h2>
+      <span class="range" id="chart-range">載入中…</span>
+    </div>
+    <div class="chart-svg-wrap" id="chart-container">
+      <p style="color:var(--text-faint); font-size:12.5px;">載入中…</p>
+    </div>
+  </div>
+
+  <div class="sec-head">
+    <h2>今日選股標的</h2>
+    <div class="note">依均線 / 量價 / KD / 法人籌碼規則篩選，僅涵蓋觀察名單30檔，非投資建議</div>
+  </div>
+
+  <section class="picks" id="picks-container">
+    <div class="pick" style="grid-column: 1/-1; text-align:center; color:var(--text-faint); padding:30px;">
+      載入選股結果中…（首次掃描約需 10–30 秒）
+    </div>
+  </section>
+
+  <div class="ai-box">
+    <div class="ai-head">
+      <span class="badge">AI 視角</span>
+      <h2>今日籌碼解讀（規則式）</h2>
+    </div>
+    <div id="ai-content">
+      <p style="color:var(--text-faint);">載入中…（若尚未設定 ANTHROPIC_API_KEY 會顯示錯誤說明）</p>
+    </div>
+  </div>
+
+  <div class="bt-box">
+    <div class="bt-head">
+      <h2>選股規則回測報告</h2>
+      <button class="bt-btn" id="bt-run-btn" onclick="loadBacktest(true)">產生 / 更新報告（約需1-2分鐘）</button>
+    </div>
+    <div id="bt-content">
+      <p style="color:var(--text-faint); font-size:12.5px;">尚未產生報告，點擊上方按鈕開始（結果會快取24小時，之後開頁面直接讀快取）。</p>
+    </div>
+  </div>
+
+  <footer>
+    大盤區塊、選股標的、個股跑馬燈皆已串接真實資料（證交所公開資料 + FinMind）；選股標的僅涵蓋固定觀察名單30檔。<br>
+    AI視角目前為規則式邏輯自動產生（非LLM，免費），依真實數據套用文字模板。以上內容不構成投資建議，投資人應自行判斷並承擔風險。
+    <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--line); color:var(--text-faint);">
+      tw-stock-analysis-app v0.1 · by folosp02
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // 前端(GitHub Pages)跟後端(Render)是不同網域，不能用相對路徑，要寫死後端網址。
+  // 本機用 start.bat 開啟時（localhost / 127.0.0.1 / file://）自動走本機API；
+  // 部署到 GitHub Pages 後，改用下面 RENDER_API_URL 這個Render服務網址。
+  // ⚠️ 部署到Render後，把 RENDER_API_URL 換成你自己的 Render service 網址
+  const RENDER_API_URL = "https://tw-stock-api-ufc8.onrender.com";
+  const API_BASE = (location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:")
+    ? "http://localhost:8000"
+    : RENDER_API_URL;
+
+  async function renderTicker(){
+    const el = document.getElementById('ticker');
+    try{
+      const res = await fetch(`${API_BASE}/api/ticker`);
+      if (!res.ok) throw new Error(`API回應狀態 ${res.status}`);
+      const data = await res.json();
+      const html = data.quotes.map(q =>
+        `<span class="item"><span class="name">${q.name} ${q.code}</span><span class="val mono ${q.is_up ? 'up':'down'}">${q.close} ${q.is_up ? '▲':'▼'}${Math.abs(q.change_percent).toFixed(2)}%</span></span>`
+      ).join("");
+      el.innerHTML = html + html; // 重複一次讓跑馬燈捲動無縫接軌
+    } catch (err){
+      console.error('抓取跑馬燈資料失敗:', err);
+      el.innerHTML = `<span class="item"><span class="name" style="color:var(--up);">跑馬燈資料載入失敗，請確認 uvicorn 是否啟動</span></span>`;
+    }
+  }
+
+  function fmtYi(v){
+    if (v === null || v === undefined) return "—";
+    const sign = v > 0 ? "+" : "";
+    return `${sign}${v.toFixed(1)}億`;
+  }
+
+  function applyInstCard(elId, value){
+    const el = document.getElementById(elId);
+    el.textContent = fmtYi(value);
+    el.classList.remove('up','down');
+    if (value > 0) el.classList.add('up');
+    else if (value < 0) el.classList.add('down');
+  }
+
+  // 觀察名單代號對照名稱（跟 stock_screener.py 的 WATCHLIST 對應）
+  const STOCK_NAMES = {
+    "2330":"台積電","2317":"鴻海","2454":"聯發科","2308":"台達電","2382":"廣達",
+    "2603":"長榮","2609":"陽明","2891":"中信金","3661":"世芯-KY","6669":"緯穎",
+    "2412":"中華電","3231":"緯創","2303":"聯電","2379":"瑞昱","3034":"聯詠",
+    "2357":"華碩","5871":"中租-KY","2881":"富邦金","2882":"國泰金","1301":"台塑",
+    "1303":"南亞","2002":"中鋼","2207":"和泰車","2201":"裕隆","3008":"大立光",
+    "2377":"微星","2409":"友達","2395":"研華","6505":"台塑化","2886":"兆豐金",
+  };
+
+  function renderPickCard(pick){
+    const name = STOCK_NAMES[pick.stock_id] || pick.stock_id;
+    const isUp = pick.change_percent >= 0;
+    const tagsHtml = pick.tags.map((t, i) =>
+      `<span class="tag ${i === 0 ? 'hot' : ''}">${t}</span>`
+    ).join("");
+    return `
+      <div class="pick">
+        <div class="pick-top">
+          <div>
+            <div class="pick-name">${name}</div>
+            <div class="pick-code mono">${pick.stock_id}</div>
+          </div>
+          <div class="pick-price">
+            <div class="p mono">${pick.close.toLocaleString('zh-TW')}</div>
+            <div class="c ${isUp ? 'up' : 'down'} mono">${isUp ? '▲' : '▼'}${Math.abs(pick.change_percent).toFixed(2)}%</div>
+          </div>
+        </div>
+        ${tagsHtml}
+        <div class="range-row">
+          <div><div class="k">建議進場區間</div><div class="v mono">${pick.entry_range[0]} – ${pick.entry_range[1]}</div></div>
+          <div><div class="k">參考停損</div><div class="v stop mono">${pick.stop_loss}</div></div>
+        </div>
+      </div>`;
+  }
+
+  async function loadStockPicks(){
+    const container = document.getElementById('picks-container');
+    try{
+      const res = await fetch(`${API_BASE}/api/stock-picks`);
+      if (!res.ok) throw new Error(`API回應狀態 ${res.status}`);
+      const data = await res.json();
+      if (!data.picks || data.picks.length === 0){
+        container.innerHTML = `<div class="pick" style="grid-column:1/-1; text-align:center; color:var(--text-faint); padding:30px;">今日觀察名單中沒有符合條件的標的</div>`;
+        return;
+      }
+      container.innerHTML = data.picks.map(renderPickCard).join("");
+    } catch (err){
+      console.error('抓取選股標的失敗:', err);
+      container.innerHTML = `<div class="pick" style="grid-column:1/-1; text-align:center; color:var(--up); padding:30px;">選股資料載入失敗，請確認 uvicorn 是否啟動</div>`;
+    }
+  }
+
+  async function loadMarketOverview(){
+    const badge = document.getElementById('data-badge');
+    try{
+      const res = await fetch(`${API_BASE}/api/market-overview`);
+      if (!res.ok) throw new Error(`API回應狀態 ${res.status}`);
+      const data = await res.json();
+
+      // 加權指數
+      const t = data.taiex;
+      document.getElementById('taiex-close').textContent =
+        t.close.toLocaleString('zh-TW', {minimumFractionDigits:2, maximumFractionDigits:2});
+      const chgEl = document.getElementById('taiex-change');
+      const arrow = t.is_up ? '▲' : '▼';
+      chgEl.textContent = `${arrow} ${Math.abs(t.change_points).toFixed(2)} (${Math.abs(t.change_percent).toFixed(2)}%)`;
+      chgEl.classList.add(t.is_up ? 'up' : 'down');
+
+      // 成交值
+      document.getElementById('turnover').textContent = `${data.turnover_yi.toLocaleString('zh-TW')}億`;
+
+      // 漲跌家數
+      const b = data.breadth;
+      const total = b.advance + b.decline + b.unchanged || 1;
+      document.getElementById('ad-fill-up').style.width = `${(b.advance/total*100).toFixed(1)}%`;
+      document.getElementById('ad-fill-down').style.width = `${(b.decline/total*100).toFixed(1)}%`;
+      document.getElementById('ad-up').textContent = `▲ ${b.advance}`;
+      document.getElementById('ad-down').textContent = `▼ ${b.decline}`;
+      document.getElementById('ad-flat').textContent = `平 ${b.unchanged}`;
+
+      // 三大法人（單位：億元，null代表當日無對應分類資料）
+      applyInstCard('inst-foreign', data.institutional_yi.foreign);
+      applyInstCard('inst-trust', data.institutional_yi.trust);
+      applyInstCard('inst-dealer', data.institutional_yi.dealer);
+
+      // 更新時間
+      const updated = new Date(data.updated_at);
+      document.getElementById('date-label').textContent =
+        updated.toLocaleDateString('zh-TW', {year:'numeric', month:'2-digit', day:'2-digit', weekday:'short'});
+
+      badge.textContent = '大盤：即時資料';
+      badge.style.color = 'var(--down)';
+      badge.style.borderColor = 'rgba(53,196,122,0.35)';
+      badge.style.background = 'var(--down-bg)';
+    } catch (err){
+      console.error('抓取大盤資料失敗:', err);
+      badge.textContent = '大盤：連線失敗（請確認 uvicorn 是否啟動）';
+      badge.style.color = 'var(--up)';
+      badge.style.borderColor = 'rgba(255,92,92,0.35)';
+      badge.style.background = 'var(--up-bg)';
+    }
+  }
+
+  async function loadAiInsight(){
+    const container = document.getElementById('ai-content');
+    try{
+      const res = await fetch(`${API_BASE}/api/ai-insight`);
+      const data = await res.json();
+      if (!res.ok || data.detail){
+        throw new Error(data.detail || `API回應狀態 ${res.status}`);
+      }
+      container.innerHTML = `
+        <p>${data.market_view}</p>
+        <p>${data.chip_view}</p>
+        <p>${data.picks_view}</p>
+        <p class="risk">風險提示：${data.risk_note}</p>
+      `;
+    } catch (err){
+      console.error('抓取AI視角失敗:', err);
+      container.innerHTML = `<p style="color:var(--up);">AI視角載入失敗：${err.message}</p>`;
+    }
+  }
+
+  function renderBacktestTables(data){
+    const s = data.summary;
+    const rb = data.rule_breakdown;
+
+    let html = `
+      <p style="font-size:12.5px; color:var(--text-dim); margin-bottom:8px;">
+        共掃描 ${s.total_days_scanned} 個交易日樣本，觸發訊號 ${s.total_signals} 次（${s.signal_rate_percent}%）
+        ${data.cached ? '<span style="color:var(--text-faint);">（讀取快取）</span>' : ''}
+      </p>
+      <table class="bt-table">
+        <thead><tr><th>整體訊號 vs 基準</th><th>5日報酬</th><th>10日報酬</th><th>20日報酬</th></tr></thead>
+        <tbody>
+          <tr><td>訊號組平均報酬</td><td class="mono">${s.signal_avg_return_5d}%</td><td class="mono">${s.signal_avg_return_10d}%</td><td class="mono">${s.signal_avg_return_20d}%</td></tr>
+          <tr><td>基準平均報酬</td><td class="mono">${s.baseline_avg_return_5d}%</td><td class="mono">${s.baseline_avg_return_10d}%</td><td class="mono">${s.baseline_avg_return_20d}%</td></tr>
+          <tr><td>優勢 edge</td>
+            <td class="mono ${s.edge_5d >= 0 ? 'up' : 'down'}">${s.edge_5d}%</td>
+            <td class="mono ${s.edge_10d >= 0 ? 'up' : 'down'}">${s.edge_10d}%</td>
+            <td class="mono ${s.edge_20d >= 0 ? 'up' : 'down'}">${s.edge_20d}%</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table class="bt-table" style="margin-top:20px;">
+        <thead><tr><th>逐條規則 edge</th><th>出現次數</th><th>5日</th><th>10日</th><th>20日</th></tr></thead>
+        <tbody>
+          ${Object.entries(rb).map(([name, r]) => `
+            <tr>
+              <td>${name}</td>
+              <td class="mono">${r.count}</td>
+              <td class="mono ${r.edge_5d >= 0 ? 'up' : 'down'}">${r.edge_5d}%</td>
+              <td class="mono ${r.edge_10d >= 0 ? 'up' : 'down'}">${r.edge_10d}%</td>
+              <td class="mono ${r.edge_20d >= 0 ? 'up' : 'down'}">${r.edge_20d}%</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+
+      <div class="bt-note">
+        edge = 訊號組平均報酬 - 基準平均報酬，正值代表該規則過去確實優於隨機基準。<br>
+        僅涵蓋固定觀察名單、約1年歷史資料，樣本間高度相關（同一檔股票常連續觸發），實際統計顯著性有限，僅供參考，非投資建議。
+      </div>
+    `;
+    document.getElementById('bt-content').innerHTML = html;
+  }
+
+  async function loadBacktest(forceRefresh){
+    const btn = document.getElementById('bt-run-btn');
+    const container = document.getElementById('bt-content');
+    btn.disabled = true;
+    btn.textContent = forceRefresh ? '執行中…（約1-2分鐘，請稍候）' : '載入中…';
+    container.innerHTML = `<p style="color:var(--text-faint); font-size:12.5px;">回測執行中，會依序掃過觀察名單每一檔股票的歷史資料，請耐心等候…</p>`;
+    try{
+      const url = `${API_BASE}/api/backtest${forceRefresh ? '?refresh=true' : ''}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || `API回應狀態 ${res.status}`);
+      renderBacktestTables(data);
+    } catch (err){
+      console.error('回測失敗:', err);
+      container.innerHTML = `<p style="color:var(--up); font-size:12.5px;">回測執行失敗：${err.message}</p>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '產生 / 更新報告（約需1-2分鐘）';
+    }
+  }
+
+  function renderTaiexChart(series){
+    const container = document.getElementById('chart-container');
+    const rangeLabel = document.getElementById('chart-range');
+    if (!series || series.length < 2){
+      container.innerHTML = `<p style="color:var(--text-faint); font-size:12.5px;">歷史資料不足，無法繪製走勢圖</p>`;
+      return;
+    }
+
+    const width = 900, height = 220, padding = { top: 16, right: 16, bottom: 24, left: 56 };
+    const closes = series.map(d => d.close);
+    const minClose = Math.min(...closes), maxClose = Math.max(...closes);
+    const yPad = (maxClose - minClose) * 0.08 || 1;
+    const yMin = minClose - yPad, yMax = maxClose + yPad;
+
+    const plotW = width - padding.left - padding.right;
+    const plotH = height - padding.top - padding.bottom;
+    const xStep = plotW / (series.length - 1);
+    const yScale = v => padding.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+
+    const points = series.map((d, i) => `${padding.left + i * xStep},${yScale(d.close)}`);
+    const isUpOverall = closes[closes.length - 1] >= closes[0];
+    const lineColor = isUpOverall ? 'var(--up)' : 'var(--down)';
+
+    const areaPoints = `${padding.left},${padding.top + plotH} ${points.join(" ")} ${padding.left + plotW},${padding.top + plotH}`;
+
+    // Y軸格線與標籤（取最高、最低、中間三條）
+    const gridVals = [yMax - yPad, (yMin + yMax) / 2, yMin + yPad];
+    const gridLines = gridVals.map(v => `
+      <line x1="${padding.left}" y1="${yScale(v)}" x2="${width - padding.right}" y2="${yScale(v)}" stroke="var(--line)" stroke-width="1" />
+      <text x="4" y="${yScale(v) + 4}" font-size="10" fill="var(--text-faint)" font-family="JetBrains Mono, monospace">${v.toFixed(0)}</text>
+    `).join("");
+
+    const svg = `
+      <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:auto; min-width:480px;">
+        ${gridLines}
+        <polygon points="${areaPoints}" fill="${lineColor}" opacity="0.08" />
+        <polyline points="${points.join(" ")}" fill="none" stroke="${lineColor}" stroke-width="2" />
+        <circle cx="${padding.left + (series.length - 1) * xStep}" cy="${yScale(closes[closes.length - 1])}" r="3.5" fill="${lineColor}" />
+      </svg>
+    `;
+    container.innerHTML = svg;
+
+    const first = series[0], last = series[series.length - 1];
+    const changePct = ((last.close - first.close) / first.close * 100).toFixed(2);
+    rangeLabel.textContent = `${first.date} ~ ${last.date}　區間${changePct >= 0 ? '+' : ''}${changePct}%`;
+  }
+
+  async function loadTaiexHistory(){
+    try{
+      const res = await fetch(`${API_BASE}/api/taiex-history?months=3`);
+      if (!res.ok) throw new Error(`API回應狀態 ${res.status}`);
+      const data = await res.json();
+      renderTaiexChart(data.series);
+    } catch (err){
+      console.error('抓取大盤走勢失敗:', err);
+      document.getElementById('chart-container').innerHTML = `<p style="color:var(--up); font-size:12.5px;">走勢圖載入失敗，請確認 uvicorn 是否啟動</p>`;
+    }
+  }
+
+  renderTicker();
+  loadMarketOverview();
+  loadTaiexHistory();
+  loadStockPicks();
+  loadAiInsight();
+</script>
+
+</body>
+</html>
